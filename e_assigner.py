@@ -1,26 +1,27 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Task Assigner
-
-Feature:                                                                          
-    Match packages with idle devices.Maintain task queue.
-"""
+#######################################################################################
+#                                   Task Assigner                                     #
+#######################################################################################
+#实现功能：                                                                           #
+#       由txt文件读入空闲设备列表，并由Redis读取当前队列信息。按照设备列表逐个对任务  #
+#   队列里的任务进行匹配，并开启子线程执行后续test。                                  #
+#                                                                                     #
+#                                                                                     #
+#######################################################################################
 import sys
 import os
 import sqlite3
 import redis
 import threading
-import subprocess
 import random
 from time import clock, ctime, sleep
 
-MAXLEN = 8    #队列长度
+MAXLEN = 5    #队列长度
 basedir = os.getcwd()   #根目录
 start = clock()
 
-class MyThread(threading.Thread):
-    """Define thread"""
+class MyThread(threading.Thread):    #线程类的定义
     def __init__(self, func, args, name=''):
         threading.Thread.__init__(self)
         self.name = name
@@ -33,38 +34,29 @@ class MyThread(threading.Thread):
         self.res = apply(self.func, self.args)
         print self.name, 'finished at:', ctime()
 
-def distribute(dev, pkglist):
-    """Match packages with device"""
+
+def distribute(dev, pkglist):    #任务匹配
     devinfo = list(getDeviceInfo(dev)[0])
     print devinfo
     for pkg in pkglist:
-        if (devinfo[1] >= int(cache.get("package:%s:sim"%pkg))
-                and devinfo[2] >= int(cache.get("package:%s:sd"%pkg))):
+        if devinfo[1] >= int(cache.get("package:%s:sim"%pkg)) and devinfo[2] >= int(cache.get("package:%s:sd"%pkg)):
             user = cache.get('package:%s:user' % pkg)
-#            t = MyThread(runs, (pkg, user), runs.__name__)    
+            t = MyThread(runs, (pkg, user), runs.__name__)    
             remove(pkg)
             add()    #补充队列
-            closeDB(cxn, cur)
-            sleep(1)
-            print 'fin', cache.lrange('pkg', 0, -1)    #打印结束时队列
-            runs(pkg, user)
-#            t.start()    #子线程开启
+            t.start()    #子线程开启
             break
     else:
         print "no match"
-    end = clock()
-    print "Total time: %g s" % (end - start)
 
-def remove(pkg):
-    """Remove package info from Redis"""
+def remove(pkg):    #删除Redis中存放的package信息
     cache.lrem('pkg', 1, pkg)
     cache.delete("package:%s:name"%pkg)
     cache.delete("package:%s:sim"%pkg)
     cache.delete("package:%s:sd"%pkg)
     cache.delete("package:%s:user"%pkg)
 
-def add():
-    """Add package to queue in Redis from database"""
+def add():    #补充队列
     while cache.llen('pkg') < MAXLEN:
         cur.execute("SELECT name FROM package WHERE status = 0 ORDER BY timestamp")    #读取数据库并按timestamp排序
         try:
@@ -77,33 +69,25 @@ def add():
             break
 
 def runs(pkg, user):
-    """Run automation test"""
     pkgdir = os.path.join(basedir, user, pkg)
     print "run %s at %s" % (pkg, pkgdir)
-    print "--------------------------------------------------------------------------"
-    sec = random.randint(25, 30)
-#    sleep(sec)
-    command = "python sleep.py"
-    subprocess.call(command.split(), shell = False)
+    sec = random.randint(25,30)
+    sleep(sec)
     print "%s finish" % pkg
 
-def connectDB():
-    """Connect Database"""
+def connectDB():    #连接sqlite数据库
     cxn = sqlite3.connect('database.db')
     cur = cxn.cursor()
     return (cxn, cur)
-def closeDB(cxn, cur):
-    """Close Database"""
+def closeDB(cxn, cur):    #断开数据库连接
     cur.close()
     cxn.commit()
     cxn.close()
 
-def getDeviceInfo(dev):
-    """Get device info from database"""
+def getDeviceInfo(dev):    #从数据库取得设备信息
     cur.execute("SELECT * FROM device WHERE IMEI = '%s'" % dev)
     return cur.fetchall()
-def getPkgInfo(pkg):
-    """Get package config from config file"""
+def getPkgInfo(pkg):    #从config文件得到package信息
     cur.execute("SELECT * FROM package WHERE name = '%s'" % pkg)
     pkginfo = cur.fetchone()
     user = pkginfo[1]
@@ -131,13 +115,13 @@ def getDeviceList():    #由list.txt文件读取当前空闲设备列表
     except:
         print "Could not open list.txt"
         exit()
-
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print "Usage: python assigner.py device"
         exit()
     else:
-        dev =sys.argv[1]
+        dev = "dev"+sys.argv[1]
+        pass
 #    devs = getDeviceList()
 #    print devs
     cache = redis.StrictRedis(host = 'localhost', port = 6379)
@@ -150,5 +134,11 @@ if __name__ == "__main__":
     try:
         distribute(dev,pkglist)
     except:
-       print "device not defined"
+        print "device not defined"
+#        continue
+    sleep(1)
+    print 'fin', cache.lrange('pkg', 0, -1)    #打印结束时队列
+    closeDB(cxn, cur)
 
+end = clock()
+print "Total time: %g s" % (end - start)

@@ -23,6 +23,9 @@ def addData():
     cur.execute("INSERT INTO package VALUES ('Message', 'user', '201308161516', 0)")
     cur.execute("INSERT INTO package VALUES ('Contact', 'user', '201308161519', 0)")
     cur.execute("INSERT INTO package VALUES ('Setting', 'user', '201308161519', 0)")
+    cur.execute("INSERT INTO package VALUES ('Downloads', 'user', '201308171519', 0)")
+    cur.execute("INSERT INTO package VALUES ('Movies', 'user', '201308171619', 0)")
+    cur.execute("INSERT INTO package VALUES ('Walkman', 'user', '201308181519', 0)")
     print "data inserted"
 
 def clear():
@@ -38,6 +41,7 @@ def showTable(table):
     cur.execute("SELECT * FROM %s"%table)
     for i in cur.fetchall():
         print i
+#showTable('package')
 clear()
 createTable()
 addData()
